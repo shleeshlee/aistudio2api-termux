@@ -41,8 +41,10 @@ fi
 
 if [ -z "$TAG" ]; then
   say "查询最新版本"
-  TAG="$(curl -fsSL "https://api.github.com/repos/$UPSTREAM/releases/latest" \
-        | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')"
+  # 跟随 releases/latest 的跳转拿版本号：不走 API（无限流），也没有管道提前关闭导致 curl 报 23
+  LATEST_URL="$(curl -fsSL -o /dev/null -w '%{url_effective}' "https://github.com/$UPSTREAM/releases/latest")" || LATEST_URL=""
+  TAG="${LATEST_URL##*/tag/}"
+  [ "$TAG" != "$LATEST_URL" ] || TAG=""
   [ -n "$TAG" ] || die "查不到最新版本，可以手动指定：bash -s -- v0.3.12"
 fi
 
