@@ -21,8 +21,23 @@ case "$(uname -m)" in
   *) die "只支持 64 位 ARM 手机（当前 $(uname -m)）；官方没有 32 位 ARM 包" ;;
 esac
 
-say "安装依赖 proot / curl / tar / ca-certificates"
-pkg install -y proot curl tar ca-certificates resolv-conf >/dev/null
+# 只装缺的包，已有的不碰：减少 apt 工作量，也避免顺带升级正在用的库
+NEED=""
+command -v proot >/dev/null 2>&1 || NEED="$NEED proot"
+command -v curl  >/dev/null 2>&1 || NEED="$NEED curl"
+command -v tar   >/dev/null 2>&1 || NEED="$NEED tar"
+[ -s "$PREFIX/etc/tls/cert.pem" ] || NEED="$NEED ca-certificates"
+[ -e "$PREFIX/etc/resolv.conf" ]  || NEED="$NEED resolv-conf"
+if [ -n "$NEED" ]; then
+  say "安装依赖:$NEED"
+  # shellcheck disable=SC2086
+  apt-get install -y --no-upgrade $NEED || {
+    say "直接安装失败，先刷新软件源再试"
+    apt-get update && apt-get install -y --no-upgrade $NEED
+  } || die "依赖安装失败。可以先单独运行：pkg install$NEED"
+else
+  say "依赖已齐全"
+fi
 
 if [ -z "$TAG" ]; then
   say "查询最新版本"
