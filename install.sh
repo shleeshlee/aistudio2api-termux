@@ -98,6 +98,8 @@ if [ \$# -eq 0 ]; then
   termux-wake-lock 2>/dev/null || true
 fi
 export SSL_CERT_FILE="$PREFIX/etc/tls/cert.pem"
+# termux-exec 的 LD_PRELOAD 会让系统加载器接手，静态程序报 "unexpected e_type: 2"
+unset LD_PRELOAD
 exec proot -b "$RESOLV:/etc/resolv.conf" "$APP_DIR/aistudio2api" "\$@"
 EOF
 chmod 755 "$LAUNCHER"
