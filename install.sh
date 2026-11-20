@@ -31,9 +31,9 @@ command -v tar   >/dev/null 2>&1 || NEED="$NEED tar"
 if [ -n "$NEED" ]; then
   say "安装依赖:$NEED"
   # shellcheck disable=SC2086
-  apt-get install -y --no-upgrade $NEED || {
+  apt-get install -y --no-upgrade $NEED </dev/null || {
     say "直接安装失败，先刷新软件源再试"
-    apt-get update && apt-get install -y --no-upgrade $NEED
+    apt-get update </dev/null && apt-get install -y --no-upgrade $NEED </dev/null
   } || die "依赖安装失败。可以先单独运行：pkg install$NEED"
 else
   say "依赖已齐全"
