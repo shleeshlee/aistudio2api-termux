@@ -9,6 +9,7 @@
 set -euo pipefail
 
 UPSTREAM="Mag1cFall/AIStudio2API"
+BACKUP="shleeshlee/AIStudio2API" # 上游删库或停更时的备份 fork
 APP_DIR="${AISTUDIO2API_HOME:-$HOME/aistudio2api}"
 TAG="${1:-}"
 
@@ -42,19 +43,32 @@ fi
 if [ -z "$TAG" ]; then
   say "查询最新版本"
   # 跟随 releases/latest 的跳转拿版本号：不走 API（无限流），也没有管道提前关闭导致 curl 报 23
-  LATEST_URL="$(curl -fsSL -o /dev/null -w '%{url_effective}' "https://github.com/$UPSTREAM/releases/latest")" || LATEST_URL=""
-  TAG="${LATEST_URL##*/tag/}"
-  [ "$TAG" != "$LATEST_URL" ] || TAG=""
+  # 上游不可用时改用备份 fork
+  for src in "$UPSTREAM" "$BACKUP"; do
+    LATEST_URL="$(curl -fsSL -o /dev/null -w '%{url_effective}' "https://github.com/$src/releases/latest" 2>/dev/null)" || continue
+    TAG="${LATEST_URL##*/tag/}"
+    if [ "$TAG" != "$LATEST_URL" ] && [ -n "$TAG" ]; then
+      [ "$src" = "$UPSTREAM" ] || say "上游不可用，改用备份 $src"
+      break
+    fi
+    TAG=""
+  done
   [ -n "$TAG" ] || die "查不到最新版本，可以手动指定：bash -s -- v0.3.12"
 fi
 
 PKG="aistudio2api-$TAG-linux-arm64"
-URL="https://github.com/$UPSTREAM/releases/download/$TAG/$PKG.tar.gz"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 say "下载 $TAG"
-curl -fL --progress-bar "$URL" -o "$TMP/pkg.tar.gz" || die "下载失败：$URL"
+GOT=false
+for src in "$UPSTREAM" "$BACKUP"; do
+  if curl -fL --progress-bar "https://github.com/$src/releases/download/$TAG/$PKG.tar.gz" -o "$TMP/pkg.tar.gz"; then
+    GOT=true; break
+  fi
+  say "从 $src 下载失败，换下一个来源"
+done
+$GOT || die "下载失败：上游和备份都下不到 $TAG"
 tar -xzf "$TMP/pkg.tar.gz" -C "$TMP"
 [ -f "$TMP/$PKG/aistudio2api" ] || die "压缩包里没有 aistudio2api，上游包结构可能变了"
 
